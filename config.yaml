@@ -1,0 +1,87 @@
+# AI-Driven Lunar Soil Composition Analysis Configuration
+
+# Project Settings
+project:
+  name: "lunar-soil-analysis"
+  version: "0.1.0"
+  description: "AI-driven lunar soil composition analysis using imagery and LLMs"
+
+# Data Settings
+data:
+  raw_data_path: "datasets/raw"
+  processed_data_path: "datasets/processed"
+  image_size: [512, 512]
+  batch_size: 32
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+
+# Model Settings
+models:
+  vision_model:
+    architecture: "resnet50"
+    pretrained: true
+    num_classes: 10
+    dropout: 0.5
+  
+  checkpoints_path: "models/checkpoints"
+  saved_models_path: "models/saved_models"
+
+# LLM Integration Settings
+llm:
+  provider: "openai"  # Options: openai, huggingface, anthropic
+  model_name: "gpt-4"
+  temperature: 0.7
+  max_tokens: 1000
+  embedding_model: "text-embedding-ada-002"
+  
+  # Prompts
+  system_prompt: "You are an expert in lunar geology and soil composition analysis."
+  analysis_template: "Analyze the following lunar soil composition data: {data}"
+
+# Vector Database Settings
+vector_db:
+  type: "chromadb"  # Options: chromadb, faiss, pinecone
+  collection_name: "lunar_soil_embeddings"
+  persist_directory: "datasets/vector_db"
+
+# Training Settings
+training:
+  epochs: 100
+  learning_rate: 0.001
+  optimizer: "adam"
+  loss_function: "cross_entropy"
+  early_stopping_patience: 10
+  device: "cuda"  # Options: cuda, cpu, mps
+
+# Visualization Settings
+visualization:
+  output_path: "reports/figures"
+  plot_format: "png"
+  dpi: 300
+  color_scheme: "viridis"
+
+# Logging Settings
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_file: "logs/lunar_analysis.log"
+  log_format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Experiment Tracking
+experiment_tracking:
+  enabled: true
+  platform: "wandb"  # Options: wandb, mlflow
+  project_name: "lunar-soil-analysis"
+
+# API Settings (for serving models)
+api:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+
+# Paths
+paths:
+  notebooks: "notebooks"
+  reports: "reports"
+  docs: "docs"
+  tests: "tests"
