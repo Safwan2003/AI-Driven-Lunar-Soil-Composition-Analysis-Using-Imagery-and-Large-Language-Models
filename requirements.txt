@@ -1,0 +1,22 @@
+# Python dependencies for the project
+# ------------------------------------
+# Install these using: pip install -r requirements.txt
+
+# AI/ML Frameworks
+tensorflow
+torch
+scikit-learn
+
+# Computer Vision and Data Manipulation
+opencv-python
+numpy
+matplotlib
+
+# LLM and Multimodal
+openai
+clip-openai
+blip
+
+# Visualization
+plotly
+folium
