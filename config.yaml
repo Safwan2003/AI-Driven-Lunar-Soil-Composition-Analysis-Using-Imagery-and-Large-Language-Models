@@ -1,0 +1,117 @@
+# Configuration file for AI-Driven Lunar Soil Composition Analysis
+
+# Project settings
+project:
+  name: "Lunar Soil Composition Analysis"
+  version: "0.1.0"
+  description: "AI-driven analysis using imagery and LLMs"
+
+# Paths
+paths:
+  data_dir: "datasets"
+  models_dir: "models"
+  reports_dir: "reports"
+  logs_dir: "logs"
+  cache_dir: "cache"
+
+# Data settings
+data:
+  image_size: [224, 224]
+  batch_size: 32
+  num_workers: 4
+  shuffle: true
+  augmentation:
+    enabled: true
+    rotation_range: 15
+    flip: true
+    brightness_range: [0.8, 1.2]
+    contrast_range: [0.8, 1.2]
+
+# Model settings
+model:
+  architecture: "resnet50"
+  pretrained: true
+  num_classes: 10
+  dropout_rate: 0.5
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  
+# Training settings
+training:
+  epochs: 100
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.001
+  checkpoint:
+    save_best_only: true
+    monitor: "val_loss"
+    mode: "min"
+  validation_split: 0.2
+
+# LLM Integration
+llm:
+  provider: "openai"  # Options: openai, anthropic, local
+  model: "gpt-4"
+  temperature: 0.7
+  max_tokens: 2000
+  api_key_env: "OPENAI_API_KEY"  # Environment variable name
+  
+  # Prompt templates
+  prompts:
+    analysis: |
+      Analyze the following lunar soil composition data:
+      {data}
+      
+      Provide a detailed analysis including:
+      1. Primary mineral composition
+      2. Geological significance
+      3. Potential resource value
+      4. Scientific insights
+    
+    report_generation: |
+      Generate a comprehensive report based on the following analysis:
+      {analysis}
+      
+      Include executive summary, detailed findings, and recommendations.
+
+# Visualization settings
+visualization:
+  dpi: 300
+  figure_size: [12, 8]
+  color_scheme: "viridis"
+  save_format: "png"
+  include_metadata: true
+
+# Logging
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  log_to_file: true
+  log_to_console: true
+
+# Mineral classification labels
+mineral_classes:
+  - "Anorthosite"
+  - "Basalt"
+  - "Breccia"
+  - "Highland regolith"
+  - "Mare regolith"
+  - "Olivine"
+  - "Pyroxene"
+  - "Plagioclase"
+  - "Ilmenite"
+  - "Mixed composition"
+
+# Performance settings
+performance:
+  use_gpu: true
+  mixed_precision: true
+  num_threads: 4
+  cache_predictions: true
+
+# Experiment tracking
+experiment:
+  tracking_enabled: false
+  tracker: "mlflow"  # Options: mlflow, wandb, tensorboard
+  experiment_name: "lunar_soil_analysis"
