@@ -1,22 +1,12 @@
-# Python dependencies for the project
-# ------------------------------------
-# Install these using: pip install -r requirements.txt
-
-# AI/ML Frameworks
-tensorflow
-torch
-scikit-learn
-
-# Computer Vision and Data Manipulation
-opencv-python
-numpy
-matplotlib
-
-# LLM and Multimodal
-openai
-clip-openai
-blip
-
-# Visualization
-plotly
-folium
+streamlit>=1.30.0
+torch>=2.0.0
+torchvision>=0.15.0
+transformers>=4.35.0
+pillow>=10.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+opencv-python-headless>=4.8.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+python-dotenv>=1.0.0

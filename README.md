@@ -1,119 +1,81 @@
-# 🛰️ AI-Driven Lunar Soil Composition Analysis Using Imagery and Large Language Models  
+# AI-Driven Lunar Soil Composition Analysis
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
-![AI](https://img.shields.io/badge/AI-Vision%20%2B%20LLM-orange)
-![Status](https://img.shields.io/badge/Status-Research--Prototype-yellow)
-![NASA Data](https://img.shields.io/badge/Data-NASA%20LRO%20%7C%20Chandrayaan%20%7C%20Clementine-lightgrey)
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-orange)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-red)
 
----
+## 🌖 Project Overview
+This project is an AI-powered framework designed to analyze **Lunar Rover RGB Imagery**. It integrates Deep Learning (CNN/ResNet) for terrain classification and soil composition estimation with a **Large Language Model (LLM)** to generate scientific reports.
 
-## 🌕 Overview  
-This project presents an **AI-driven pipeline** for analyzing **lunar soil (regolith) composition** using **satellite imagery** and **Large Language Models (LLMs)**.  
-By combining **computer vision** and **language understanding**, the system can classify regolith types, detect minerals, estimate hydration, and produce **explainable natural-language reports** for scientific interpretation.
+**Key Goals:**
+- **Terrain Classification**: Detect Craters, Boulders, and Regolith.
+- **Soil Analysis**: Estimate elemental composition (Fe, Ti, Si) from visual features.
+- **Automated Reporting**: Generate natural language summaries of findings.
 
-It acts as a prototype of an **AI Lunar Geologist** — a system that not only *analyzes* but also *explains* lunar surface characteristics, assisting mission planners, rover operators, and researchers in **future lunar exploration** and **resource utilization (ISRU)**.
-
----
-
-## 🎯 Objectives  
-- Develop an AI pipeline for lunar imagery classification.  
-- Integrate Vision Models (CNN/ViT) with LLM reasoning for explainable analysis.  
-- Generate natural-language soil composition and suitability reports.  
-- Provide decision-support for rover navigation and mission site selection.  
-
----
-
-## 🧠 Methodology  
-
-### 1. Data Collection  
-- Utilize open lunar datasets:  
-  - **NASA Lunar Reconnaissance Orbiter (LRO)**  
-  - **ISRO Chandrayaan Mission**  
-  - **Clementine Mission**  
-- Include multispectral/hyperspectral data for mineral detection.
-
-### 2. Preprocessing  
-- Denoising, normalization, and feature extraction.  
-- Band selection for mineral mapping (Fe, Mg, Ti, Si, H₂O).
-
-### 3. Model Development  
-- **Vision Models:** CNN / Vision Transformers (ViT) for regolith classification.  
-- **LLM Integration:** Combine outputs with multimodal reasoning (e.g., GPT, CLIP, BLIP).  
-- Generate human-readable explanations for classification results.
-
-### 4. Output Generation  
-- Soil composition maps with mineral overlays.  
-- Automated LLM-generated text summaries describing findings.  
-
-### 5. Validation  
-- Compare predictions against **Apollo mission soil data** and published lunar mineralogical studies.  
-
----
-
-## ⚙️ Project Structure  
-AI-Driven-Lunar-Soil-Composition/
-│
+## 📂 Project Structure
+```
+.
+├── app/
+│   └── main.py              # Streamlit Frontend Application
+├── data/                    # Dataset storage (created via notebook)
+├── models/
+│   └── terrain_classifier.py # PyTorch Model Definition
+├── notebooks/
+│   └── 01_Data_Acquisition_and_Training.ipynb # Colab Notebook for Data & Training
 ├── src/
-│ ├── data/ # Data collection & preprocessing scripts
-│ ├── models/ # CNN/ViT architectures and training code
-│ ├── llm_integration/ # Vision-to-LLM interpretation pipeline
-│ ├── visualization/ # Map rendering and dashboards
-│ ├── utils/ # Helper functions & metrics
-│
-├── notebooks/ # Jupyter notebooks for experiments
-├── datasets/ # Dataset placeholders (NASA/ISRO/Clementine)
-├── reports/ # Auto-generated reports and maps
-├── docs/ # Documentation and research notes
-├── tests/ # Unit and integration tests
-│
-├── config.yaml # Model and experiment configurations
-├── requirements.txt # Python dependencies
-├── setup.py # Installation script
-├── LICENSE # MIT License
-├── .gitignore # Ignored files list
-└── README.md # Project overview
+│   └── llm_engine.py        # Logic for LLM Report Generation
+├── requirements.txt         # Project Dependencies
+└── README.md                # Project Documentation
+```
 
+## 🚀 Getting Started
 
+### 1. Data Acquisition & Training (Google Colab)
+Since the dataset is large (Chang'e 3 Mission Data), we use **Google Colab** for downloading and training.
 
+1.  Open `notebooks/01_Data_Acquisition_and_Training.ipynb`.
+2.  Upload it to [Google Colab](https://colab.research.google.com/) or run it locally if you have a GPU.
+3.  Run all cells to:
+    - Download PCAM/TCAM images from The Planetary Society.
+    - Train the `ResNet-18` model.
+    - Save the model weights to `models/lunar_terrain_model.pth`.
 
+### 2. Running the Web Application (Local)
+Once you have the model (or just to test the UI):
 
----
+**Prerequisites:**
+- Python 3.8+ installed.
+- Virtual Environment set up.
 
-## 🧩 Tools & Technologies  
-
-| Category | Tools |
-|-----------|-------|
-| **AI/ML** | Python, TensorFlow, PyTorch, scikit-learn |
-| **Vision** | OpenCV, NumPy, Matplotlib |
-| **LLMs** | OpenAI GPT APIs, CLIP, BLIP |
-| **Visualization** | Plotly, Folium, GIS Mapping |
-| **Data Sources** | NASA LRO, Chandrayaan, Clementine Missions |
-
----
-
-## 🚀 Installation  
-
+**Installation:**
 ```bash
-# Clone the repository
-git clone https://github.com/<your-username>/AI-Driven-Lunar-Soil-Composition.git
-cd AI-Driven-Lunar-Soil-Composition
-
-# Create virtual environment
+# 1. Create Virtual Env
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
+# 2. Activate Env
+# Windows:
+.\venv\Scripts\activate
+# Mac/Linux:
+source venv/bin/activate
+
+# 3. Install Requirements
 pip install -r requirements.txt
+```
 
+**Launch App:**
+```bash
+streamlit run app/main.py
+```
 
+## 🛠 Features
+- **Interactive Dashboard**: Upload images and view real-time analysis.
+- **Deep Learning Inference**: Uses ResNet-18 for robust terrain segmentation.
+- **Scientific Reporting**: Mock LLM integration (extensible to OpenAI GPT-4V) provides context-aware summaries.
 
+## 📚 Data Source
+Data is sourced from the **Chang'e 3** mission via **The Planetary Society** mirrors.
+- [PCAM Data Link](http://planetary.s3.amazonaws.com/data/change3/pcam.html)
+- [TCAM Data Link](http://planetary.s3.amazonaws.com/data/change3/tcam.html)
 
-
-
-
-
-
-
-
-
+## 📄 License
+This project is for educational purposes (FYP).
