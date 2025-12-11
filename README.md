@@ -189,8 +189,3 @@ Academic Use Only - Final Year Project
 - [Project Proposal](docs/FYP_Proposal.pdf) *(if available)*
 
 ---
-
-**Need Help?**  
-Check `labeled_data/suparco/README.md` for integration instructions.
-
-For LLM setup: Get your free Gemini API key at [ai.google.dev](https://ai.google.dev)
