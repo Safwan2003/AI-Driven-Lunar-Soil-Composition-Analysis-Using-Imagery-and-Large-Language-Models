@@ -174,8 +174,8 @@ The system automatically merges and prioritizes SUPARCO data over synthetic labe
 
 ## 🤝 Contributors
 
-**Student:** [Your Name]  
-**Supervisor:** Dr. Zubair Arif  
+**Student:** Safwan Ali & Shayaan Khurram  
+**Supervisor:** Dr. Raazia Sosan  
 **Organization:** SUPARCO
 
 ## 📝 License
