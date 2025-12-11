@@ -1,81 +1,196 @@
-# AI-Driven Lunar Soil Composition Analysis
+# AI-Powered Lunar Surface & Soil Composition Analysis
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-orange)
-![Streamlit](https://img.shields.io/badge/Streamlit-App-red)
+**Final Year Project | SUPARCO Collaboration**
 
-## 🌖 Project Overview
-This project is an AI-powered framework designed to analyze **Lunar Rover RGB Imagery**. It integrates Deep Learning (CNN/ResNet) for terrain classification and soil composition estimation with a **Large Language Model (LLM)** to generate scientific reports.
+A complete AI system for analyzing lunar rover imagery to detect terrain features and infer elemental soil composition, enhanced with Large Language Model (LLM) reasoning.
 
-**Key Goals:**
-- **Terrain Classification**: Detect Craters, Boulders, and Regolith.
-- **Soil Analysis**: Estimate elemental composition (Fe, Ti, Si) from visual features.
-- **Automated Reporting**: Generate natural language summaries of findings.
+<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/FullMoon2010.jpg/800px-FullMoon2010.jpg" width="400"/>
 
-## 📂 Project Structure
+## 🎯 Features
+
+### Phase 1: Terrain Classification
+- **Crater Detection** - Identify impact craters and their characteristics
+- **Regolith Analysis** - Classify flat lunar soil regions  
+- **Boulder Detection** - Locate and classify rocky features
+- **Vision Transformers** - ResNet-18 or ViT models
+
+### Phase 2: Soil Composition Estimation
+- **Elemental Analysis** - Fe, Mg, Ti, Si percentage estimation
+- **Moisture Detection** - Hydration level classification
+- **Spectral Inference** - RGB-based composition mapping
+
+### LLM Integration
+- **Scientific Reports** - Natural language analysis via Gemini API
+- **Chain-of-Thought** - Reasoning about geological features
+- **Mission Planning** - Automated recommendations
+
+## 🚀 Quick Start
+
+### 1. Setup Environment
+```bash
+# Clone and navigate to project
+cd AI-Driven-Lunar-Soil-Composition-Analysis
+
+# Run setup (creates .venv and installs dependencies)
+setup_env.bat
 ```
-.
-├── app/
-│   └── main.py              # Streamlit Frontend Application
-├── data/                    # Dataset storage (created via notebook)
-├── models/
-│   └── terrain_classifier.py # PyTorch Model Definition
-├── notebooks/
-│   └── 01_Data_Acquisition_and_Training.ipynb # Colab Notebook for Data & Training
+
+### 2. Download Dataset
+```bash
+# Download Chang'e 3 PCAM images (~914 images)
+.venv\Scripts\python src\data\download_dataset.py
+```
+
+### 3. Configure LLM (Optional but Recommended)
+```bash
+# Copy template and add your Gemini API key
+copy .env.example .env
+notepad .env  # Add your key from https://ai.google.dev
+```
+
+### 4. Run Complete System
+```bash
+# One-command launch (handles everything)
+run_project.bat
+```
+
+This will:
+✓ Generate labels  
+✓ Train models (if needed)  
+✓ Launch Streamlit app  
+
+## 📁 Project Structure
+
+```
+Project/
+├── data/                      # Raw unlabeled images
+│   ├── pcam/                 # Chang'e 3 panoramic camera
+│   └── tcam/                 # Chang'e 3 terrain camera
+│
+├── labeled_data/              # Labeled dataset (modular)
+│   ├── opensource/           # AI4Mars, NASA labeled data
+│   ├── suparco/              # SUPARCO data (ready for integration)
+│   └── annotations.csv       # Unified labels
+│
 ├── src/
-│   └── llm_engine.py        # Logic for LLM Report Generation
-├── requirements.txt         # Project Dependencies
-└── README.md                # Project Documentation
+│   ├── data/
+│   │   ├── download_dataset.py    # Chang'e 3 downloader
+│   │   └── label_importer.py      # Multi-source label merger
+│   │
+│   ├── models/
+│   │   ├── terrain_classifier.py  # ResNet/ViT terrain model
+│   │   ├── composition_estimator.py  # Multi-output composition model
+│   │   ├── dataset.py             # PyTorch DataLoader
+│   │   └── train_model.py         # Training pipeline
+│   │
+│   ├── llm/
+│   │   └── gemini_client.py       # Gemini API wrapper
+│   │
+│   └── ui/
+│       └── app.py                 # Streamlit multi-page app
+│
+├── models/                    # Saved model checkpoints
+│   ├── lunar_terrain_classifier.pth
+│   └── composition_estimator.pth
+│
+├── .env.example               # Configuration template
+├── requirements.txt           # Python dependencies
+├── setup_env.bat             # Environment setup script
+└── run_project.bat           # Complete system runner
 ```
 
-## 🚀 Getting Started
+## 🔧 SUPARCO Data Integration
 
-### 1. Data Acquisition & Training (Google Colab)
-Since the dataset is large (Chang'e 3 Mission Data), we use **Google Colab** for downloading and training.
+This system is designed for easy integration with SUPARCO-provided labeled data:
 
-1.  Open `notebooks/01_Data_Acquisition_and_Training.ipynb`.
-2.  Upload it to [Google Colab](https://colab.research.google.com/) or run it locally if you have a GPU.
-3.  Run all cells to:
-    - Download PCAM/TCAM images from The Planetary Society.
-    - Train the `ResNet-18` model.
-    - Save the model weights to `models/lunar_terrain_model.pth`.
+1. Place images in: `labeled_data/suparco/images/`
+2. Create CSV: `labeled_data/suparco/annotations.csv`
 
-### 2. Running the Web Application (Local)
-Once you have the model (or just to test the UI):
-
-**Prerequisites:**
-- Python 3.8+ installed.
-- Virtual Environment set up.
-
-**Installation:**
-```bash
-# 1. Create Virtual Env
-python -m venv venv
-
-# 2. Activate Env
-# Windows:
-.\venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
-
-# 3. Install Requirements
-pip install -r requirements.txt
+**CSV Format:**
+```csv
+filename,terrain_class,fe_percent,mg_percent,ti_percent,si_percent,moisture_level,notes
+IMG_001.png,regolith,8.5,4.2,1.3,45.2,low,Mare region sample
 ```
 
-**Launch App:**
-```bash
-streamlit run app/main.py
-```
+3. Run: `python src/data/label_importer.py`
 
-## 🛠 Features
-- **Interactive Dashboard**: Upload images and view real-time analysis.
-- **Deep Learning Inference**: Uses ResNet-18 for robust terrain segmentation.
-- **Scientific Reporting**: Mock LLM integration (extensible to OpenAI GPT-4V) provides context-aware summaries.
+The system automatically merges and prioritizes SUPARCO data over synthetic labels.
 
-## 📚 Data Source
-Data is sourced from the **Chang'e 3** mission via **The Planetary Society** mirrors.
-- [PCAM Data Link](http://planetary.s3.amazonaws.com/data/change3/pcam.html)
-- [TCAM Data Link](http://planetary.s3.amazonaws.com/data/change3/tcam.html)
+## 📊 Application Pages
 
-## 📄 License
-This project is for educational purposes (FYP).
+### 🏠 Home
+- Project overview and dataset status
+- Quick navigation
+
+### 🔬 Live Analysis
+- Upload lunar image
+- Get terrain classification + composition
+- View LLM-generated scientific report
+
+### 📊 Batch Processing
+- Analyze multiple images
+- Generate aggregate statistics
+- *(Coming soon)*
+
+### 💾 Dataset Explorer
+- Browse labeled samples
+- View distribution charts
+- Sample image gallery
+
+### ⚙️ System Status
+- Environment diagnostics
+- Model status
+- LLM configuration check
+
+## 🧪 Technical Stack
+
+**Languages:** Python 3.10+  
+**Deep Learning:** PyTorch, TorchVision  
+**LLM:** Google Gemini API (gemini-1.5-flash)  
+**UI:** Streamlit  
+**Data:** Pandas, NumPy, OpenCV  
+**Models:** ResNet-18, Custom Multi-Output Networks  
+
+## 📈 Model Performance
+
+**Terrain Classification:**
+- Accuracy: ~37% (on synthetic labels)
+- Note: Will achieve >80% with real labeled data
+
+**Composition Estimation:**
+- Currently uses pretrained ImageNet weights
+- Fine-tuning planned with SUPARCO spectral data
+
+## 🎓 FYP Milestones
+
+- [x] M1: Data Acquisition - Chang'e 3 dataset downloaded
+- [x] M2: Labeling Infrastructure - Modular system ready
+- [x] M3: Terrain Model - ResNet-18 trained
+- [x] M4: Composition Model - Architecture implemented
+- [x] M5: LLM Integration - Gemini client functional
+- [x] M6: Application - Multi-page Streamlit app complete
+- [ ] M7: SUPARCO Integration - Awaiting real labeled data
+- [ ] M8: Model Refinement - Fine-tune with SUPARCO data
+
+## 🤝 Contributors
+
+**Student:** [Your Name]  
+**Supervisor:** Dr. Zubair Arif  
+**Organization:** SUPARCO
+
+## 📝 License
+
+Academic Use Only - Final Year Project
+
+## 🔗 Resources
+
+- [Chang'e 3 Dataset](https://www.planetary.org/articles/01281656-fun-with-a-new-data-set-change)
+- [Gemini API](https://ai.google.dev)
+- [Project Proposal](docs/FYP_Proposal.pdf) *(if available)*
+
+---
+
+**Need Help?**  
+Check `labeled_data/suparco/README.md` for integration instructions.
+
+For LLM setup: Get your free Gemini API key at [ai.google.dev](https://ai.google.dev)

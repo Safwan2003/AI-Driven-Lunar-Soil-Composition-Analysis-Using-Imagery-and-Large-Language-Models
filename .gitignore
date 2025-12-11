@@ -1,60 +1,51 @@
+# Environment Variables (DO NOT COMMIT)
+.env
+
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
-env/
+
+# Virtual Environments
 venv/
 .venv/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+ENV/
+env/
+.venv
 
-# Jupyter Notebooks
-.ipynb_checkpoints
-
-# VS Code
+# IDEs
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Project Specific
-# Ignore large datasets
-data/
-# Ignore trained model weights (large binaries)
+# Data (large files)
+/data/
+/labeled_data/opensource/images/
+/labeled_data/suparco/images/
+
+# Models (checkpoints)
 models/*.pth
 models/*.pt
-# But keep the models directory gitkeep if it existed (not applicable here, but good practice)
+!models/.gitkeep
 
-# Environment Variables
-.env
-.env.local
-
-# Web / Node
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Logs
+# Results
+results/
+outputs/
 *.log
 
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+desktop.ini
+
+# Jupyter
+.ipynb_checkpoints
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
