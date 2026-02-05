@@ -31,6 +31,7 @@ env/
 models/*.pth
 models/*.pt
 !models/.gitkeep
+src/models_data/
 
 # Results
 results/
@@ -49,3 +50,6 @@ desktop.ini
 htmlcov/
 .coverage
 .coverage.*
+
+# Secrets
+.env

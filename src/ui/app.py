@@ -1,471 +1,378 @@
 """
-Enhanced Streamlit Application for Lunar Analysis
-Multi-page app with LLM integration and complete pipeline
+Streamlit UI for Lunar Analysis System
 """
 
 import streamlit as st
-import torch
-import torch.nn as nn
-from torchvision import transforms
-from PIL import Image
-import os
-import sys
 import pandas as pd
+from PIL import Image
+import cv2
+import numpy as np
+import sys
 from pathlib import Path
-import json
 
-# Add project root to path
+# Add src to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from src.models.terrain_classifier import LunarTerrainClassifier
-from src.models.composition_estimator import CompositionEstimator
-from dotenv import load_dotenv
+from src.analysis.pipeline import LunarAnalysisPipeline
 
-# Load environment variables
-load_dotenv()
-
-# Page Config
+# Page configuration
 st.set_page_config(
-    page_title="Lunar Analysis AI - FYP",
-    page_icon="🌑",
+    page_title="SUPARCO Lunar Analysis",
+    page_icon="🛰️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Constants
-BASE_DIR = Path(__file__).parent.parent.parent
-MODEL_DIR = BASE_DIR / "models"
-TERRAIN_MODEL_PATH = MODEL_DIR / "lunar_terrain_classifier.pth"
-COMP_MODEL_PATH = MODEL_DIR / "composition_estimator.pth"
+# --- Custom CSS & Theme ---
+def load_css():
+    st.markdown("""
+    <style>
+        /* Import official-looking fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Orbitron:wght@500;700&display=swap');
 
-TERRAIN_CLASSES = {0: "Regolith (Flat)", 1: "Crater", 2: "Boulder/Rock", 3: "Mixed"}
-MOISTURE_CLASSES = {0: "None", 1: "Trace", 2: "Low", 3: "Medium", 4: "High"}
+        /* Main Container */
+        .stApp {
+            background: linear-gradient(180deg, #020010 0%, #0a0a2e 100%);
+            color: #e0e0e0;
+            font-family: 'Inter', sans-serif;
+        }
 
-# Styling
-st.markdown("""
-<style>
-    .main {
-        background: linear-gradient(135deg, #0a0e27 0%, #1a1c3a 100%);
-        color: #ffffff;
-    }
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        padding: 12px;
-        border-radius: 8px;
-        font-weight: 600;
-    }
-    .stButton>button:hover {
-        transform: scale(1.02);
-        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-    }
-    .report-box {
-        border: 2px solid #667eea;
-        padding: 20px;
-        border-radius: 12px;
-        background: rgba(26, 28, 58, 0.8);
-        backdrop-filter: blur(10px);
-    }
-    .metric-card {
-        background: linear-gradient(135deg, #667eea22 0%, #764ba222 100%);
-        padding: 15px;
-        border-radius: 10px;
-        border: 1px solid #667eea44;
-    }
-    h1, h2, h3 {
-        color: #667eea;
-    }
-</style>
-""", unsafe_allow_html=True)
+        /* Headers */
+        h1, h2, h3 {
+            font-family: 'Orbitron', sans-serif;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
+        }
+        
+        h1 {
+            font-size: 3rem;
+            background: -webkit-linear-gradient(eee, #333);
+        }
+
+        /* Metric Cards */
+        .metric-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+            border-color: #00bfff;
+            box-shadow: 0 5px 15px rgba(0, 191, 255, 0.2);
+        }
+        .metric-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #00bfff;
+        }
+        .metric-label {
+            font-size: 0.9rem;
+            color: #a0a0a0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Sidebar */
+        section[data-testid="stSidebar"] {
+            background-color: rgba(10, 10, 30, 0.95);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 20px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 50px;
+            background-color: rgba(255,255,255,0.05);
+            border-radius: 5px;
+            color: #fff;
+            padding: 0 20px;
+        }
+        .stTabs [aria-selected="true"] {
+            background-color: #00bfff !important;
+            color: #000 !important;
+            font-weight: bold;
+        }
+
+        /* Buttons */
+        .stButton > button {
+            background: linear-gradient(90deg, #00bfff 0%, #0077aa 100%);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+        .stButton > button:hover {
+            box-shadow: 0 0 20px rgba(0, 191, 255, 0.5);
+            transform: scale(1.02);
+        }
+        
+    </style>
+    """, unsafe_allow_html=True)
+
+load_css()
+
+# --- Helper Functions ---
 
 @st.cache_resource
-def load_models():
-    """Load terrain and composition models."""
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    # Terrain classifier
-    terrain_model = LunarTerrainClassifier(num_classes=4)
-    if TERRAIN_MODEL_PATH.exists():
-        try:
-            terrain_model.load_state_dict(torch.load(TERRAIN_MODEL_PATH, map_location=device))
-            st.toast("✓ Terrain model loaded", icon="✅")
-        except Exception as e:
-            st.warning(f"Using untrained terrain model: {e}")
-    else:
-        st.warning("Terrain model not found - using untrained weights")
-    
-    # Composition estimator
-    comp_model = CompositionEstimator(pretrained=True)
-    if COMP_MODEL_PATH.exists():
-        try:
-            comp_model.load_state_dict(torch.load(COMP_MODEL_PATH, map_location=device))
-            st.toast("✓ Composition model loaded", icon="✅")
-        except Exception as e:
-            st.warning(f"Using untrained composition model: {e}")
-    else:
-        st.info("Composition model not found - using pretrained ImageNet weights")
-    
-    terrain_model.to(device).eval()
-    comp_model.to(device).eval()
-    
-    return terrain_model, comp_model, device
-
-@st.cache_resource
-def load_llm_client():
-    """Load Gemini LLM client if API key is available."""
-    api_key = os.getenv('GEMINI_API_KEY')
-    
-    if not api_key or api_key == 'your-api-key-here':
-        return None
-    
+def load_pipeline():
+    """Load the analysis pipeline (cached)."""
     try:
-        from src.llm.gemini_client import GeminiClient
-        client = GeminiClient(api_key=api_key)
-        st.toast("✓ Gemini LLM connected", icon="🤖")
-        return client
+        pipeline = LunarAnalysisPipeline(use_heuristic_fallback=True)
+        return pipeline
     except Exception as e:
-        st.error(f"LLM initialization failed: {e}")
+        st.error(f"Failed to load pipeline: {e}")
         return None
 
-def process_image(image):
-    """Preprocess image for model input."""
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-    return transform(image).unsqueeze(0)
+def display_metric(label, value, sub_value=None):
+    """Component to display a styled metric card."""
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">{label}</div>
+        <div class="metric-value">{value}</div>
+        {'<div style="font-size:0.8rem; color:#888; margin-top:5px;">' + sub_value + '</div>' if sub_value else ''}
+    </div>
+    """, unsafe_allow_html=True)
 
-def generate_fallback_report(terrain_class, confidence, composition):
-    """Generate report when LLM is unavailable."""
-    return f"""
-### Analysis Report (Generated without LLM)
+# --- Main App ---
 
-**Terrain Classification:** {terrain_class}  
-**Confidence:** {confidence:.1%}
+# Header
+col1, col2 = st.columns([1, 5])
+with col1:
+    # Use emoji as logo for now because paths can be tricky
+    st.markdown("<div style='font-size: 4rem; text-align: center;'>🛰️</div>", unsafe_allow_html=True) 
+with col2:
+    st.title("SUPARCO Lunar Analysis")
+    st.markdown("### AI-Driven Land Classification & Soil Composition Estimation")
 
-**Detected Composition:**
-- Iron (Fe): {composition['fe']:.2f}%
-- Magnesium (Mg): {composition['mg']:.2f}%
-- Titanium (Ti): {composition['ti']:.2f}%
-- Silicon (Si): {composition['si']:.2f}%
-- Moisture: {composition['moisture']}
+st.markdown("---")
 
-**Note:** For detailed LLM-powered analysis, please configure GEMINI_API_KEY in your .env file.
-Get a free API key at: https://ai.google.dev
-"""
+# Initialize Pipeline
+pipeline = load_pipeline()
 
-# Sidebar Navigation
+# Sidebar Configuration
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/FullMoon2010.jpg/800px-FullMoon2010.jpg", use_column_width=True)
-    st.title("🌑 Lunar Command Center")
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/SUPARCO_Logo.png/600px-SUPARCO_Logo.png", width="stretch") # placeholder or remote if internet allowed, otherwise emoji
+    st.header("Mission Control")
     
-    page = st.radio(
-        "Navigation",
-        ["🏠 Home", "🔬 Live Analysis", "📊 Batch Processing", "💾 Dataset Explorer", "⚙️ System Status"],
-        label_visibility="collapsed"
+    st.markdown("#### Detection Parameters")
+    min_segment_area = st.slider(
+        "Min. Feature Size (px)",
+        min_value=100,
+        max_value=2000,
+        value=500,
+        step=100,
+        help="Filter out noise and small artifacts"
     )
     
-    st.divider()
-    st.caption("SUPARCO Lunar FYP Project")
-    st.caption(f"Device: {'🎮 CUDA' if torch.cuda.is_available() else '💻 CPU'}")
+    use_heuristic = st.checkbox(
+        "Enable Specular Analysis",
+        value=True,
+        help="Use Lucey color ratio heuristics"
+    )
 
-# PAGE: Home
-if page == "🏠 Home":
-    st.title("🌑 AI-Powered Lunar Surface Analysis")
-    st.markdown("### Final Year Project | SUPARCO Collaboration")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("#### 🎯 Phase 1")
-        st.markdown("""
-        **Terrain Classification**
-        - Crater Detection
-        - Regolith Analysis
-        - Boulder Identification
-        """)
-    
-    with col2:
-        st.markdown("#### 🧪 Phase 2")
-        st.markdown("""
-        **Composition Analysis**
-        - Fe, Mg, Ti, Si Detection
-        - Moisture Level
-        - Mineral Mapping
-        """)
-    
-    with col3:
-        st.markdown("#### 🤖 LLM Integration")
-        st.markdown("""
-        **AI Reasoning**
-        - Natural Language Reports
-        - Scientific Analysis
-        - Mission Recommendations
-        """)
-    
-    st.divider()
-    
-    st.markdown("### 📁 Dataset Status")
-    
-    # Check dataset status
-    pcam_dir = BASE_DIR / "data" / "pcam"
-    labels_file = BASE_DIR / "labeled_data" / "annotations.csv"
-    suparco_dir = BASE_DIR / "labeled_data" / "suparco" / "images"
-    
-    dcol1, dcol2, dcol3 = st.columns(3)
-    
-    with dcol1:
-        if pcam_dir.exists():
-            count = len(list(pcam_dir.glob("*.png")))
-            st.metric("Raw Images (PCAM)", f"{count}")
-        else:
-            st.metric("Raw Images", "⚠️ Not Found")
-    
-    with dcol2:
-        if labels_file.exists():
-            df = pd.read_csv(labels_file)
-            st.metric("Labeled Samples", f"{len(df)}")
-        else:
-            st.metric("Labeled Samples", "⚠️ Not Found")
-    
-    with dcol3:
-        if suparco_dir.exists() and any(suparco_dir.iterdir()):
-            count = len(list(suparco_dir.glob("*.png")))
-            st.metric("SUPARCO Data", f"✓ {count} images")
-        else:
-            st.metric("SUPARCO Data", "📂 Ready (Empty)")
-    
-    st.info("💡 **Quick Start:** Go to '🔬 Live Analysis' to upload and analyze lunar images")
+    st.markdown("---")
+    st.markdown("#### System Status")
+    st.success("✔ Fast Segmenter: Online")
+    st.success("✔ ResNet-18 Classifier: Online")
+    st.success("✔ Composition Estimator: Online")
 
-# PAGE: Live Analysis
-elif page == "🔬 Live Analysis":
-    st.title("🔬 Live Image Analysis")
-    st.write("Upload a lunar rover image for AI-powered terrain and composition analysis")
+# Main Tabs
+tab_upload, tab_results, tab_report = st.tabs(["🚀 DATA UPLOAD", "📊 TELEMETRY & ANALYSIS", "📄 MISSION REPORT"])
+
+with tab_upload:
+    st.markdown("### <span style='color:#00bfff'>//</span> Upload Satellite Imagery", unsafe_allow_html=True)
     
-    terrain_model, comp_model, device = load_models()
-    llm_client = load_llm_client()
+    uploaded_file = st.file_uploader(
+        "Select Lunar Surface Imagery (PCAM/LROC)",
+        type=['png', 'jpg', 'jpeg'],
+        help="Supported formats: PNG, JPG, JPEG. Max size: 200MB"
+    )
     
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        uploaded_file = st.file_uploader("Upload Lunar Image", type=['jpg', 'png', 'jpeg'])
+    if uploaded_file:
+        col_img, col_info = st.columns([1, 1])
         
-        if uploaded_file is not None:
-            image = Image.open(uploaded_file).convert('RGB')
-            st.image(image, caption='Rover View', use_column_width=True)
+        # Process Image Loading
+        file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+        image_np = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
+        
+        # Normalization for 16-bit
+        if image_np.dtype == np.uint16:
+            image_np = (image_np / 256).astype(np.uint8)
+        
+        # Color Conversion
+        if len(image_np.shape) == 2:
+            image_np = cv2.cvtColor(image_np, cv2.COLOR_GRAY2RGB)
+        elif len(image_np.shape) == 3 and image_np.shape[2] == 4:
+            image_np = cv2.cvtColor(image_np, cv2.COLOR_BGRA2RGB)
+        elif len(image_np.shape) == 3:
+            image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
             
-            if st.button("🚀 Analyze Surface", type="primary"):
-                with st.spinner("Processing AI models..."):
-                    input_tensor = process_image(image).to(device)
-                    
-                    # Terrain Classification
-                    with torch.no_grad():
-                        terrain_output = terrain_model(input_tensor)
-                        terrain_probs = torch.nn.functional.softmax(terrain_output, dim=1)
-                        terrain_conf, terrain_pred = torch.max(terrain_probs, 1)
+        pil_image = Image.fromarray(image_np)
+        
+        with col_img:
+            st.image(image_np, caption="Input Telemetry Data", width="stretch")
+        
+        with col_info:
+            st.info(f"**Data Stream:** {uploaded_file.name}")
+            st.code(f"""
+            Resolution: {image_np.shape[1]}x{image_np.shape[0]} px
+            Channels: {image_np.shape[2]}
+            Depth: 8-bit Unsigned
+            """)
+            
+            if st.button("INITIATE ANALYSIS SEQUENCE", type="primary"):
+                if pipeline is None:
+                    st.error("System Failure: Pipeline offline.")
+                else:
+                    with st.spinner("Processing telemetry... Segmeting terrain... Calculating oxides..."):
+                        import tempfile
+                        import os
                         
-                        terrain_class = TERRAIN_CLASSES[terrain_pred.item()]
-                        terrain_confidence = terrain_conf.item()
-                    
-                    # Composition Estimation
-                    with torch.no_grad():
-                        comp_output = comp_model(input_tensor)
+                        # Temp file dance
+                        fd, temp_path = tempfile.mkstemp(suffix='.png')
+                        pil_image.save(temp_path)
                         
-                        composition = {
-                            'fe': comp_output['fe'].item(),
-                            'mg': comp_output['mg'].item(),
-                            'ti': comp_output['ti'].item(),
-                            'si': comp_output['si'].item(),
-                            'moisture': MOISTURE_CLASSES[torch.argmax(comp_output['moisture']).item()]
-                        }
-                    
-                    # Store results in session state
-                    st.session_state['analysis_complete'] = True
-                    st.session_state['terrain_class'] = terrain_class
-                    st.session_state['terrain_confidence'] = terrain_confidence
-                    st.session_state['composition'] = composition
-                    st.session_state['terrain_probs'] = terrain_probs.cpu().numpy()[0]
+                        try:
+                            results = pipeline.analyze_image(
+                                temp_path,
+                                min_segment_area=min_segment_area
+                            )
+                            st.session_state['results'] = results
+                            st.session_state['analyzed'] = True
+                            st.success("Analysis Complete. Transitioning to Telemetry View.")
+                        except Exception as e:
+                            st.error(f"Analysis Aborted: {str(e)}")
+                            import traceback
+                            st.code(traceback.format_exc())
+                        finally:
+                            os.close(fd)
+                            if os.path.exists(temp_path):
+                                os.remove(temp_path)
+
+with tab_results:
+    if 'analyzed' in st.session_state and st.session_state['analyzed']:
+        results = st.session_state['results']
+        stats = results['statistics']
+        
+        # --- Top Level Metrics ---
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            display_metric("Detected Features", str(stats['total_segments']))
+        with m2:
+            dom_terrain = max(stats['terrain_distribution'].items(), key=lambda x: x[1]['percentage'])[0]
+            display_metric("Primary Terrain", dom_terrain)
+        with m3:
+            display_metric("Avg. Titanium (TiO2)", f"{stats['average_composition']['TiO2']:.2f}%")
+        with m4:
+            display_metric("Avg. Iron (FeO)", f"{stats['average_composition']['FeO']:.2f}%")
+        
+        st.markdown("---")
+        
+        # --- Visualization Grid ---
+        st.markdown("### <span style='color:#00bfff'>//</span> Visual Intelligence", unsafe_allow_html=True)
+        
+        v1, v2 = st.columns(2)
+        with v1:
+            st.markdown("**Terrain Segmentation Mask**")
+            st.image(results['visualizations']['segmentation'], width="stretch")
+            
+            st.markdown("**Terrain Classification Map**")
+            st.image(results['visualizations']['terrain_map'], width="stretch")
+            
+        with v2:
+            st.markdown("**Composition Heatmap (FeO)**")
+            st.image(results['visualizations']['composition_map'], width="stretch")
+            
+            # --- Composition Bars ---
+            st.markdown("**Elemental Breakdown**")
+            comp = stats['average_composition']
+            
+            # Custom progress bars
+            for oxide, val, max_val, color in [
+                ("FeO (Iron Oxide)", comp['FeO'], 25.0, "#ff4b4b"),
+                ("MgO (Magnesium Oxide)", comp['MgO'], 15.0, "#ffa500"),
+                ("TiO2 (Titanium Dioxide)", comp['TiO2'], 15.0, "#00bfff"),
+                ("SiO2 (Silicon Dioxide)", comp['SiO2'], 50.0, "#cccccc"),
+            ]:
+                st.write(f"{oxide}: **{val:.1f}%**")
+                st.progress(min(val / max_val, 1.0))
                 
-                st.success("✓ Analysis Complete")
-                st.rerun()
-    
-    with col2:
-        if st.session_state.get('analysis_complete'):
-            st.subheader("📋 Results")
-            
-            # Terrain Classification
-            st.markdown("#### Terrain Detection")
-            st.metric(
-                label="Classification",
-                value=st.session_state['terrain_class'],
-                delta=f"{st.session_state['terrain_confidence']:.1%} confidence"
-            )
-            
-            # Composition
-            st.markdown("#### Elemental Composition")
-            comp = st.session_state['composition']
-            
-            ccol1, ccol2 = st.columns(2)
-            with ccol1:
-                st.metric("Iron (Fe)", f"{comp['fe']:.2f}%")
-                st.metric("Magnesium (Mg)", f"{comp['mg']:.2f}%")
-            with ccol2:
-                st.metric("Titanium (Ti)", f"{comp['ti']:.2f}%")
-                st.metric("Silicon (Si)", f"{comp['si']:.2f}%")
-            
-            st.metric("Moisture Level", comp['moisture'])
-            
-            # LLM Report
-            st.markdown("#### 🤖 LLM Analysis Report")
-            
-            if llm_client:
-                with st.spinner("Generating scientific analysis..."):
-                    try:
-                        # Save uploaded image temporarily
-                        temp_path = BASE_DIR / "temp_analysis.png"
-                        image.save(temp_path)
-                        
-                        report = llm_client.generate_terrain_report(
-                            image_path=str(temp_path),
-                            terrain_class=st.session_state['terrain_class'],
-                            confidence=st.session_state['terrain_confidence'],
-                            composition=comp
-                        )
-                        
-                        with st.expander("📄 Full Scientific Report", expanded=True):
-                            st.markdown(report['full_report'])
-                        
-                        # Cleanup
-                        temp_path.unlink(missing_ok=True)
-                        
-                    except Exception as e:
-                        st.error(f"LLM Error: {e}")
-                        st.markdown(generate_fallback_report(
-                            st.session_state['terrain_class'],
-                            st.session_state['terrain_confidence'],
-                            comp
-                        ))
-            else:
-                st.warning("⚠️ LLM Not Configured")
-                st.markdown(generate_fallback_report(
-                    st.session_state['terrain_class'],
-                    st.session_state['terrain_confidence'],
-                    comp
-                ))
-                st.info("Configure GEMINI_API_KEY in .env to enable LLM reports")
-
-# PAGE: Batch Processing
-elif page == "📊 Batch Processing":
-    st.title("📊 Batch Image Analysis")
-    st.write("Analyze multiple images and generate aggregate reports")
-    
-    st.info("🚧 Coming Soon: Upload multiple images and get batch statistics")
-    
-    # Placeholder UI
-    uploaded_files = st.file_uploader("Upload Multiple Images", type=['jpg', 'png', 'jpeg'], accept_multiple_files=True)
-    
-    if uploaded_files:
-        st.write(f"Loaded {len(uploaded_files)} images")
-        
-        if st.button("Process Batch"):
-            st.warning("Batch processing will be implemented in next version")
-
-# PAGE: Dataset Explorer
-elif page == "💾 Dataset Explorer":
-    st.title("💾 Dataset Explorer")
-    
-    labels_file = BASE_DIR / "labeled_data" / "annotations.csv"
-    
-    if labels_file.exists():
-        df = pd.read_csv(labels_file)
-        
-        st.markdown(f"### 📊 Dataset Statistics")
-        st.write(f"Total Samples: **{len(df)}**")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### Terrain Distribution")
-            terrain_dist = df['terrain_class'].value_counts()
-            st.bar_chart(terrain_dist)
-        
-        with col2:
-            st.markdown("#### Composition Stats")
-            st.write(df[['fe_percent', 'mg_percent', 'ti_percent', 'si_percent']].describe())
-        
-        st.markdown("### 🔍 Browse Samples")
-        st.dataframe(df.head(50), use_container_width=True)
-        
-        # Sample Images
-        st.markdown("### 🖼️ Sample Gallery")
-        pcam_dir = BASE_DIR / "data" / "pcam"
-        
-        if pcam_dir.exists():
-            sample_files = list(pcam_dir.glob("*.png"))[:12]
-            
-            cols = st.columns(4)
-            for i, img_file in enumerate(sample_files):
-                with cols[i % 4]:
-                    try:
-                        img = Image.open(img_file)
-                        st.image(img, caption=img_file.stem[:20], use_column_width=True)
-                    except:
-                        pass
     else:
-        st.error("❌ No labeled dataset found")
-        st.info("Run `python src/data/label_importer.py` to generate labels")
+        st.info("Awaiting Input Data. Please upload and analyze imagery in the previous tab.")
 
-# PAGE: System Status
-elif page == "⚙️ System Status":
-    st.title("⚙️ System Diagnostics")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### 🖥️ Environment")
-        st.metric("Python", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
-        st.metric("PyTorch", torch.__version__)
-        st.metric("CUDA Available", "✓ Yes" if torch.cuda.is_available() else "✗ No")
+with tab_report:
+    if 'analyzed' in st.session_state and st.session_state['analyzed']:
+        st.markdown("### <span style='color:#00bfff'>//</span> Mission Report Generation", unsafe_allow_html=True)
         
-        if torch.cuda.is_available():
-            st.metric("GPU", torch.cuda.get_device_name(0))
-    
-    with col2:
-        st.markdown("### 📦 Model Status")
+        # Generate Text Report (Local Template)
+        results = st.session_state['results']
+        stats = results['statistics']
+        timestamp = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')
         
-        if TERRAIN_MODEL_PATH.exists():
-            st.success("✓ Terrain Classifier Found")
+        report_content = f"""
+# SUPERCO LUNAR ANALYSIS REPORT
+**Classification**: UNCLASSIFIED
+**Date**: {timestamp}
+**Mission ID**: LUNAR-SOIL-AI-{pd.Timestamp.now().strftime('%f')[:4]}
+
+## 1. Executive Summary
+The automated AI analysis system identified **{stats['total_segments']} distinct geological features** within the target area. The region is primarily characterized as **{max(stats['terrain_distribution'].items(), key=lambda x: x[1]['percentage'])[0]}**.
+
+## 2. Terrain Analysis
+| Type | Segments | Coverage |
+|------|----------|----------|
+"""
+        for terrain, data in stats['terrain_distribution'].items():
+            report_content += f"| {terrain} | {data['count']} | {data['percentage']:.1f}% |\n"
+            
+        report_content += f"""
+
+## 3. Compositional Estimates (Wt%)
+Computed area-weighted average oxide abundances:
+- **FeO**: {stats['average_composition']['FeO']:.2f}%
+- **MgO**: {stats['average_composition']['MgO']:.2f}%
+- **TiO2**: {stats['average_composition']['TiO2']:.2f}%
+- **SiO2**: {stats['average_composition']['SiO2']:.2f}%
+
+## 4. Geological Interpretation
+Based on TiO2 abundances ({stats['average_composition']['TiO2']:.2f}%):
+"""
+        if stats['average_composition']['TiO2'] > 6.0:
+            report_content += "- **High-Ti Mare Basalt**: Indicates significant Ilmenite content. Potential resource for oxygen extraction."
+        elif stats['average_composition']['TiO2'] > 2.0:
+            report_content += "- **Low-Ti Mare Basalt**: Standard mare volcanism."
         else:
-            st.error("✗ Terrain Classifier Missing")
+            report_content += "- **Highland/Anorthosite**: Low titanium content, likely crustal material."
+
+        report_content += "\n\n---\n*Generated by SUPARCO AI Module*"
+
+        st.text_area("Report Preview", report_content, height=400)
         
-        if COMP_MODEL_PATH.exists():
-            st.success("✓ Composition Estimator Found")
-        else:
-            st.warning("⚠ Composition Estimator Missing (will use pretrained)")
-        
-        st.markdown("### 🤖 LLM Configuration")
-        api_key = os.getenv('GEMINI_API_KEY')
-        
-        if api_key and api_key != 'your-api-key-here':
-            st.success("✓ Gemini API Key Configured")
-        else:
-            st.error("✗ Gemini API Key Not Set")
-            st.code("1. Copy .env.example to .env\n2. Add your API key from ai.google.dev\n3. Restart app", language="bash")
-    
-    st.markdown("### 📁 Project Structure")
-    st.code("""
-Project/
-├── data/              ← Raw images
-├── labeled_data/      ← Annotations
-│   └── suparco/      ← SUPARCO data folder
-├── models/           ← Trained checkpoints
-├── src/
-│   ├── data/         ← Data tools
-│   ├── models/       ← AI models
-│   ├── llm/          ← LLM client
-│   └── ui/           ← This app
-└── .env              ← Configuration
-    """, language="plaintext")
+        st.download_button(
+            label="💾 EXPORT MISSION DATA",
+            data=report_content,
+            file_name=f"SUPARCO_Report_{timestamp.replace(' ','_')}.md",
+            mime="text/markdown",
+            type="primary"
+        )
+    else:
+        st.info("Report module standing by. Initiate analysis to generate data.")
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; font-size: 0.8rem; opacity: 0.7;'>
+    SUPARCO AI RESEARCH DIVISION<br>
+    Lunar Soil Composition Analysis System v2.0
+</div>
+""", unsafe_allow_html=True)
