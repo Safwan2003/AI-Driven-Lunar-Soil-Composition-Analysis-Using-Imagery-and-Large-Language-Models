@@ -30,7 +30,9 @@ class LunarSegmenter:
         self,
         model_path: str = "src/models_data/sam2.1_hiera_tiny.pt",
         config_path: str = "configs/sam2.1/sam2.1_hiera_t.yaml",  # Correct Hydra path
-        device: str = None
+        device: str = None,
+        points_per_side: int = 16,     # Reduced from 32 for speed
+        crop_n_layers: int = 0         # Reduced from 1 for speed
     ):
         """
         Initialize SAM 2.1 segmenter.
@@ -39,6 +41,8 @@ class LunarSegmenter:
             model_path: Path to SAM 2.1 checkpoint
             config_path: SAM 2 config file name (without .yaml extension)
             device: 'cuda', 'cpu', or None (auto-detect)
+            points_per_side: Density of point grid for automatic mask generation
+            crop_n_layers: Number of layers for multi-scale cropping (0 = single scale)
         """
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         logger.info(f"Initializing SAM 2.1 on {self.device}")
@@ -53,15 +57,15 @@ class LunarSegmenter:
         # Configure automatic mask generator
         self.generator = SAM2AutomaticMaskGenerator(
             model=self.model,
-            points_per_side=32,           # Grid density for automatic prompting
-            pred_iou_thresh=0.86,         # Quality threshold
-            stability_score_thresh=0.92,  # Stability threshold
-            crop_n_layers=1,              # Multi-scale cropping
+            points_per_side=points_per_side,
+            pred_iou_thresh=0.8,         # Slightly more lenient
+            stability_score_thresh=0.9,  # Slightly more lenient
+            crop_n_layers=crop_n_layers,
             crop_n_points_downscale_factor=2,
             min_mask_region_area=100,     # Filter tiny segments
         )
         
-        logger.info("SAM 2.1 initialized successfully")
+        logger.info(f"SAM 2.1 initialized (points={points_per_side}, layers={crop_n_layers})")
     
     def segment_image(self, image: np.ndarray) -> List[Dict]:
         """

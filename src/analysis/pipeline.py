@@ -43,17 +43,23 @@ class LunarAnalysisPipeline:
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         logger.info(f"Initializing Lunar Analysis Pipeline on {self.device}")
         
-        # Use fast OpenCV segmenter (much faster on CPU than SAM 2)
+        # Use SAM 2.1 for high-precision segmentation (as requested by user)
         self.use_terrain = True
         try:
-            from ..terrain.fast_segmenter import FastSegmenter
-            self.segmenter = FastSegmenter()
-            logger.info("✅ Fast Segmenter loaded - Terrain segmentation enabled")
+            from ..terrain.sam2_segmenter import LunarSegmenter
+            self.segmenter = LunarSegmenter(model_path=sam_model_path, device=self.device)
+            logger.info("✅ SAM 2.1 loaded - Terrain segmentation enabled")
         except Exception as e:
-            logger.warning(f"⚠️ Segmenter not available: {e}")
-            logger.info("Running in COMPOSITION-ONLY mode")
-            self.segmenter = None
-            self.use_terrain = False
+            logger.warning(f"⚠️ SAM 2.1 not available ({e}). Falling back to FastSegmenter...")
+            try:
+                from ..terrain.fast_segmenter import FastSegmenter
+                self.segmenter = FastSegmenter()
+                logger.info("✅ FastSegmenter loaded as fallback")
+            except Exception as e2:
+                logger.warning(f"⚠️ FastSegmenter failed: {e2}")
+                logger.info("Running in COMPOSITION-ONLY mode")
+                self.segmenter = None
+                self.use_terrain = False
         
         # Initialize terrain classifier (uses pretrained ImageNet weights)
         if self.use_terrain:
@@ -70,13 +76,21 @@ class LunarAnalysisPipeline:
         else:
             self.terrain_classifier = None
         
-        # Composition estimation (heuristic is fast and accurate)
-        self.use_heuristic = True
-        self.composition_predictor = None  # Use heuristic by default
+        # Composition estimation (CNN prioritized, heuristic as fallback)
+        try:
+            from ..composition.rgb_regressor import CompositionPredictor
+            self.composition_predictor = CompositionPredictor(
+                model_path=composition_model_path if Path(composition_model_path).exists() else None,
+                device=self.device
+            )
+            logger.info("✅ Composition CNN loaded")
+        except Exception as e:
+            logger.warning(f"⚠️ Composition CNN failed to load ({e}). Using heuristic only.")
+            self.composition_predictor = None
         
         self.heuristic_estimator = LuceyHeuristicEstimator()
         
-        logger.info("✅ Pipeline ready (Fast mode)")
+        logger.info("✅ Pipeline ready")
     
     def analyze_image(
         self,
@@ -101,34 +115,30 @@ class LunarAnalysisPipeline:
         
         # Load image
         img = cv2.imread(str(image_path))
+        if img is None:
+            raise FileNotFoundError(f"Could not read image at {image_path}")
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
         if self.use_terrain and self.segmenter:
             # FULL MODE: Segmentation + Classification + Composition
-            # Step 1: Segment with FastSegmenter
-            masks = self.segmenter.segment_image(img_rgb, min_area=min_segment_area)
-            logger.info(f"FastSegmenter found {len(masks)} segments")
+            # Step 1: Segment image
+            masks = self.segmenter.segment_image(img_rgb)
+            
+            # Filter by area
+            masks = [m for m in masks if m.get('area', 0) >= min_segment_area]
             
             if len(masks) == 0:
-                # Fallback to whole image if no segments found
-                logger.warning("No segments found, using whole image")
                 return self._analyze_whole_image(img_rgb)
             
-            # Step 2: Extract crops for analysis
+            # Step 2: Extract crops
             crops = self.segmenter.extract_mask_crops(img_rgb, masks, padding=10)
             
             # Step 3: Classify terrain
             if self.terrain_classifier:
                 classifications = self.terrain_classifier.classify_masks(img_rgb, crops)
             else:
-                # Default classification if no classifier
-                classifications = []
-                for crop in crops:
-                    classifications.append({
-                        **crop,
-                        'class_name': 'Rocky Region',
-                        'confidence': 0.5
-                    })
+                classifications = [{'crop': c['crop'], 'bbox': c['bbox'], 'area': c['area'], 
+                                   'class_name': 'Rocky Region', 'confidence': 0.5} for c in crops]
             
             # Step 4: Estimate composition
             segments = []
@@ -136,11 +146,14 @@ class LunarAnalysisPipeline:
                 crop = classification['crop']
                 terrain_class = classification['class_name']
                 
-                # Composition estimation using heuristic
-                composition = self.heuristic_estimator.estimate_composition(
-                    crop,
-                    terrain_class=terrain_class
-                )
+                # Try CNN first, fallback to heuristic
+                if self.composition_predictor and self.composition_predictor.model:
+                    composition = self.composition_predictor.predict(crop)
+                else:
+                    composition = self.heuristic_estimator.estimate_composition(
+                        crop,
+                        terrain_class=terrain_class
+                    )
                 
                 segments.append({
                     'id': i,
@@ -149,7 +162,7 @@ class LunarAnalysisPipeline:
                     'terrain_class': terrain_class,
                     'terrain_confidence': classification['confidence'],
                     'composition': composition,
-                    'mask': masks[i]['mask']  # Use 'mask' key from FastSegmenter
+                    'mask': masks[i].get('segmentation', masks[i].get('mask'))
                 })
             
             # Visualizations
@@ -270,10 +283,13 @@ class LunarAnalysisPipeline:
         logger.info("Using whole-image analysis mode")
         
         # Estimate composition for whole image
-        composition = self.heuristic_estimator.estimate_composition(
-            img_rgb,
-            terrain_class='Rocky Region'
-        )
+        if self.composition_predictor and self.composition_predictor.model:
+            composition = self.composition_predictor.predict(img_rgb)
+        else:
+            composition = self.heuristic_estimator.estimate_composition(
+                img_rgb,
+                terrain_class='Rocky Region'
+            )
         
         h, w = img_rgb.shape[:2]
         segments = [{

@@ -26,6 +26,7 @@ env/
 /data/
 /labeled_data/opensource/images/
 /labeled_data/suparco/images/
+/labeled_data/terrain/
 
 # Models (checkpoints)
 models/*.pth

@@ -1,13 +1,12 @@
 """
-RGB-based Composition Regressor
-Deep learning model for estimating lunar soil elemental composition from RGB imagery.
+Multi-Head RGB-based Composition Regressor
+Dedicated heads for FeO, MgO, TiO2, and SiO2.
 """
 
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
 from torchvision import models
-import timm
 import numpy as np
 from pathlib import Path
 from typing import Dict, Tuple
@@ -15,160 +14,92 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class CompositionCNN(nn.Module):
     """
-    CNN-based regressor for lunar soil composition.
-    Predicts [FeO, MgO, TiO2, SiO2] percentages from RGB images.
+    Multi-head CNN-based regressor for lunar soil composition.
+    Dedicated branches for each oxide.
     """
     
     def __init__(self, backbone: str = 'resnet18', pretrained: bool = True):
-        """
-        Initialize composition regressor.
-        
-        Args:
-            backbone: Model architecture ('resnet18', 'efficientnet_b0', etc.)
-            pretrained: Use ImageNet pretrained weights
-        """
         super().__init__()
         
-        # Load backbone
+        # 1. Shared Feature Extractor
         if backbone == 'resnet18':
-            self.backbone = models.resnet18(pretrained=pretrained)
-            feature_dim = self.backbone.fc.in_features
-            self.backbone.fc = nn.Identity()  # Remove classification head
-        elif backbone.startswith('efficientnet'):
-            self.backbone = timm.create_model(backbone, pretrained=pretrained, num_classes=0)
-            feature_dim = self.backbone.num_features
+            resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = resnet.fc.in_features
+            self.backbone = nn.Sequential(*list(resnet.children())[:-1]) # Remove FC
         else:
             raise ValueError(f"Unsupported backbone: {backbone}")
         
-        # Composition regression head
-        self.regressor = nn.Sequential(
-            nn.Linear(feature_dim, 256),
+        # 2. Shared neck for dimensionality reduction
+        self.neck = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(feature_dim, 512),
             nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(128, 4)  # [FeO, MgO, TiO2, SiO2]
+            nn.Dropout(0.2)
         )
         
-        logger.info(f"Initialized CompositionCNN with {backbone} backbone")
+        # 3. Dedicated Geological Heads
+        # Each head predicts a single value
+        self.head_feo = self._make_head(512)
+        self.head_mgo = self._make_head(512)
+        self.head_tio2 = self._make_head(512)
+        self.head_sio2 = self._make_head(512)
+        
+        logger.info(f"Initialized Multi-Head CompositionCNN with {backbone} backbone")
+
+    def _make_head(self, in_dim):
+        return nn.Sequential(
+            nn.Linear(in_dim, 128),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(128, 1),
+            nn.Sigmoid() # Normalize 0-1, will scale to 0-100 later
+        )
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass.
-        
-        Args:
-            x: Batch of images (B, 3, H, W)
-            
-        Returns:
-            Composition percentages (B, 4)
-        """
         features = self.backbone(x)
-        composition = self.regressor(features)
+        neck_out = self.neck(features)
         
-        # Ensure outputs are in valid range (0-100%)
-        composition = torch.sigmoid(composition) * 100.0
+        # Individual predictions
+        feo = self.head_feo(neck_out) * 100.0
+        mgo = self.head_mgo(neck_out) * 100.0
+        tio2 = self.head_tio2(neck_out) * 100.0
+        sio2 = self.head_sio2(neck_out) * 100.0
         
-        return composition
+        # Concatenate back to [B, 4] for compatibility with existing loss functions
+        return torch.cat([feo, mgo, tio2, sio2], dim=1)
 
 
 class CompositionPredictor:
     """
-    Complete pipeline for composition prediction.
+    Complete pipeline for multi-head composition prediction.
     """
     
     ELEMENTS = ['FeO', 'MgO', 'TiO2', 'SiO2']
     
-    def __init__(
-        self,
-        model_path: str = None,
-        device: str = None
-    ):
-        """
-        Initialize composition predictor.
-        
-        Args:
-            model_path: Path to trained model checkpoint (optional)
-            device: 'cuda', 'cpu', or None (auto-detect)
-        """
+    def __init__(self, model_path: str = None, device: str = None):
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
-        
-        # Initialize model
         self.model = CompositionCNN(backbone='resnet18', pretrained=True)
         
-        # Load checkpoint if available
         if model_path and Path(model_path).exists():
             checkpoint = torch.load(model_path, map_location=self.device)
             self.model.load_state_dict(checkpoint['model_state_dict'])
-            logger.info(f"Loaded composition model from {model_path}")
-        else:
-            logger.warning("No trained model - predictions will be random. Train the model first.")
+            logger.info(f"Loaded Multi-Head model from {model_path}")
         
         self.model.to(self.device)
         self.model.eval()
         
-        # Preprocessing
         self.transform = transforms.Compose([
             transforms.ToPILImage(),
             transforms.Resize((224, 224)),
             transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225]
-            )
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
     
     def predict(self, image: np.ndarray) -> Dict[str, float]:
-        """
-        Predict composition from RGB image.
-        
-        Args:
-            image: RGB image (H, W, 3), uint8
-            
-        Returns:
-            Dict with element names and percentages
-        """
-        # Preprocess
         img_tensor = self.transform(image).unsqueeze(0).to(self.device)
-        
-        # Predict
         with torch.no_grad():
             composition = self.model(img_tensor)
         
-        # Convert to dict
-        result = {
-            element: composition[0, i].item()
-            for i, element in enumerate(self.ELEMENTS)
-        }
-        
-        return result
-    
-    def predict_batch(self, images: list) -> list:
-        """
-        Batch prediction for multiple images.
-        
-        Args:
-            images: List of RGB images
-            
-        Returns:
-            List of composition dicts
-        """
-        results = []
-        for img in images:
-            results.append(self.predict(img))
-        return results
-
-
-if __name__ == "__main__":
-    # Test composition model
-    model = CompositionCNN()
-    print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
-    
-    # Test forward pass
-    dummy_input = torch.randn(2, 3, 224, 224)
-    output = model(dummy_input)
-    print(f"Output shape: {output.shape}")
-    print(f"Sample prediction: {output[0].tolist()}")
+        return {element: composition[0, i].item() for i, element in enumerate(self.ELEMENTS)}
