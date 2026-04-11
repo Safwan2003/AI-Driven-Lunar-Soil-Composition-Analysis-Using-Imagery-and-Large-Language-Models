@@ -1,6 +1,6 @@
 """
 Unified Lunar Analysis Pipeline
-Integrates segmentation, classification, and composition estimation.
+Integrates segmentation, classification, composition estimation, and LLM reporting.
 """
 
 import numpy as np
@@ -89,8 +89,23 @@ class LunarAnalysisPipeline:
             self.composition_predictor = None
         
         self.heuristic_estimator = LuceyHeuristicEstimator()
-        
+
+        # LLM Reporter (lazy-load to avoid import errors if google-generativeai missing)
+        self._llm_reporter = None
+
         logger.info("✅ Pipeline ready")
+
+    @property
+    def llm_reporter(self):
+        """Lazy-initialize LLM reporter on first use."""
+        if self._llm_reporter is None:
+            try:
+                from ..llm.llm_reporter import LunarLLMReporter
+                self._llm_reporter = LunarLLMReporter()
+            except Exception as e:
+                logger.warning(f"LLM reporter not available: {e}")
+                self._llm_reporter = False  # Sentinel: tried and failed
+        return self._llm_reporter if self._llm_reporter else None
     
     def analyze_image(
         self,
@@ -178,14 +193,45 @@ class LunarAnalysisPipeline:
         # Compute statistics
         stats = self._compute_statistics(segments)
         
-        return {
+        result = {
             'image': img_rgb,
             'segments': segments,
             'statistics': stats,
             'visualizations': visualizations,
             'mode': 'terrain' if self.use_terrain else 'composition_only'
         }
+        return result
     
+    def generate_report(
+        self,
+        analysis_results: Dict,
+        use_vision: bool = True,
+        mission_context: str = ""
+    ) -> str:
+        """
+        Generate an LLM-powered scientific mission report from analysis results.
+
+        Args:
+            analysis_results: Output from analyze_image()
+            use_vision: If True, pass the original image to Gemini Vision
+            mission_context: Optional extra context for the report
+
+        Returns:
+            Markdown-formatted report string
+        """
+        reporter = self.llm_reporter
+        if reporter is None:
+            # Import directly as fallback
+            from ..llm.llm_reporter import LunarLLMReporter
+            reporter = LunarLLMReporter()
+
+        image = analysis_results.get('image') if use_vision else None
+        return reporter.generate_report(
+            analysis_results,
+            image=image,
+            mission_context=mission_context
+        )
+
     def _compute_statistics(self, segments: List[Dict]) -> Dict:
         """Compute overall statistics from segments."""
         stats = {
@@ -214,8 +260,9 @@ class LunarAnalysisPipeline:
         # Average composition (area-weighted)
         for segment in segments:
             weight = segment['area'] / total_area
-            for element in ['FeO', 'MgO', 'TiO2', 'SiO2']:
-                stats['average_composition'][element] += segment['composition'][element] * weight
+            for element in ['FeO', 'MgO', 'TiO2', 'SiO2', 'Al2O3', 'CaO']:
+                if element in segment['composition']:
+                    stats['average_composition'][element] = stats['average_composition'].get(element, 0.0) + segment['composition'][element] * weight
         
         # Round averages
         for element in stats['average_composition']:

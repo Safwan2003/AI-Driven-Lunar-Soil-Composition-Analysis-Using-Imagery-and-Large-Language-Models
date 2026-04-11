@@ -6,48 +6,42 @@
 
 ## 🎯 Project Overview
 
-This system analyzes lunar surface images to estimate soil composition (FeO, TiO2, MgO, SiO2) using:
-- **Heuristic Color Ratio Method** (Lucey et al., 2000)  
-- **SAM 2.1 Segmentation** (optional, for terrain analysis)
-- **Deep Learning CNNs** (optional, for enhanced accuracy)
+This system analyzes lunar surface images to estimate soil composition (FeO, TiO2, MgO, SiO2, Al2O3, CaO) using:
+- **Calibrated Heuristic Color Ratio Method** (Anchored to CE-3 APXS ground truth)  
+- **SAM 2.1 Segmentation** (Precision terrain analysis)
+- **Deep Learning ResNet-18** (Terrain classification)
+- **Gemini 2.0 LLM** (Scientific geological reporting)
 
-**Status**: ✅ **Phase 1-3 Complete**, ⚙️ **Phase 4 In Progress**
+**Status**: ✅ **Phase 4 Complete**, 🚀 **Ready for FYP Presentation**
 
 ---
 
 ## 🚀 Quick Start
 
-###Option 1: Composition-Only Demo (Works Now!)
+### Run the Analysis System
 
 ```bash
-# Launch the app
-stream lit run src/ui/app.py
+# Launch the Mission Control UI
+streamlit run src/ui/app.py
 
-# Open http://localhost:8501
-# Upload any image from data/pcam/
-```
-
-### Option 2: Full Setup (Including Terrain)
-
-```bash
-# Run automated setup
-./setup_phase4.sh
+# 1. Open http://localhost:8501
+# 2. Upload an image from data/pcam/
+# 3. View automated composition analysis and terrain mapping
+# 4. Generate the AI Scientific Mission Report
 ```
 
 ---
 
-## 📊 What's Included
+## 📊 System Features
 
-### ✅ Working Features
-- **457 PCAM Images** downloaded from Chang'e 3
-- **Heuristic Composition Estimator** (scientifically validated)
-- **Weak Label Generator** (199 training samples)
-- **Streamlit Web UI** (interactive analysis)
-- **Automated Setup Scripts**
-
-### ⚙️ In Development
-- SAM 2.1 terrain segmentation  
-- Trained CNN models (architecture ready)
+### ✅ Fully Operational
+- **457 PCAM Images**: Real data from Chang'e 3 Yutu Rover
+- **High-Precision Segmentation**: SAM 2.1 for identifying craters, boulders, and regolith
+- **6-Oxide Estimation**: Scientifically validated FeO, TiO2, MgO, SiO2, Al2O3, and CaO wt%
+- **Geologic Classifier**: Identifies units like Highland Anorthosite, Mare Basalts, KREEP, etc.
+- **AI Mission Reporter**: Deep interpretative reports powered by Gemini 2.0
+- **SUPARCO Mission Control UI**: Interactive dashboard with real-time telemetry
+- **Physics-Based Constraints**: Enforces oxide-sum conservation and geochemical anticorrelations
 
 ---
 
@@ -57,99 +51,53 @@ stream lit run src/ui/app.py
 ├── data/
 │   └── pcam/              # 457 downloaded lunar images
 ├── src/
-│   ├── data/              # Data acquisition
-│   ├── terrain/           # SAM 2.1 + classification
-│   ├── composition/       # Heuristic + CNN estimators
-│   ├── analysis/          # Unified pipeline
-│   └── ui/                # Streamlit interface
-├── scripts/               # Training & setup tools
-└── labeled_data/          # Generated training data
+│   ├── terrain/           # SAM 2.1 + ResNet-18 Classification
+│   ├── composition/       # Calibrated Heuristic Estimators
+│   ├── analysis/          # Unified Multi-Phase Pipeline
+│   ├── llm/               # Gemini Scientific Reporter
+│   └── ui/                # Streamlit Mission Control
+├── docs/                  # Research reports and scientific basis
+└── labeled_data/          # Generated terrain training sets
 ```
 
 ---
 
 ## 🧪 Scientific Approach
 
-### Composition Estimation Logic
+### Composition Estimation (Lucey + APXS)
 
-We use **Lucey Color Ratios** (peer-reviewed NASA method):
+Our pipeline uses a hybrid method anchored to **Chang'e-3 APXS in-situ data** (Nature Communications 2015):
 
-1. **TiO2 (Titanium)**: `Blue/Red ratio`
-   - High ratio (>1.2) → Mare regions (8% TiO2)
-   - Low ratio (<1.0) → Highlands (<1% TiO2)
-
-2. **FeO (Iron)**: Image brightness
-   - Darker → More iron (15-18%)
-   - Brighter → Less iron (4-6%)
-
-See `docs/composition_logic.md` for details.
+1. **TiO2 (Titanium)**: Calibrated Blue/Red ratio (proxy for 415nm/750nm)
+2. **FeO (Iron)**: Brightness-based albedo inversion with maturity correction
+3. **MgO/SiO2/Al2O3/CaO**: Derived through physics-based geochemical trade-off models
+4. **Maturity Correction**: Spatial texture standard deviation (OMAT proxy) adjusts for space weathering
 
 ---
 
-## 📚 Documentation
+## 📚 Mission Research
 
-- **Implementation Plan**: `/brain/.../implementation_plan.md`
-- **Walkthrough**: `/brain/.../walkthrough.md`
-- **Phase 4 Guide**: `/brain/.../phase4_guide.md`
-- **Composition Logic**: `/brain/.../composition_logic.md`
-
----
-
-## 🎓 For Your Presentation
-
-**Key Points**:
-1. ✅ **457 real lunar images** analyzed
-2. ✅ **Scientifically validated** heuristic method
-3. ✅ **Complete data pipeline** (scraping → analysis)
-4. ✅ **Interactive demo** (Streamlit UI)
-5. ⚙️ **Extensible** (CNN training ready)
-
-**Demo Flow**:
-1. Show data acquisition (457 images)
-2. Explain color ratio science
-3. Live demo: Upload → Instant composition
-4. Future work: Terrain segmentation, CNN training
+- **SUPARCO Context**: Designed for ICUBE-Qamar 1MP optical cameras.
+- **Geochemical Logic**: Based on Lucey (2000) and Prettyman (2006).
+- **Architecture**: Segment Anything Model 2.1 for foundational computer vision.
 
 ---
 
-## 🔧 Technical Stack
+## 🎓 FYP Presentation Highlights
 
-- **Python 3.10+**
-- **PyTorch** (Deep learning)
-- **SAM 2** (Segmentation)
-- **Streamlit** (UI)
-- **OpenCV** (Image processing)
-
----
-
-## 📝 Citation
-
-If using this work, please cite:
-- Lucey et al. (2000) - Color ratio methodology
-- Facebook Research SAM 2.1
-- Chang'e 3 PCAM dataset
+**Key Successes**:
+1. ✅ **ICUBE-Q Alignment**: Processes 1MP RGB data exactly as Pakistan's lunar satellite requires.
+2. ✅ **Scientific Rigor**: Anchored to real Moon-landing ground truth (APXS), not just visual heuristics.
+3. ✅ **End-to-End Flow**: Image → Terrain Map → Chemical Profile → Scientific Report.
+4. ✅ **Modern AI Stack**: SAM 2.1, ResNet-18, and Gemini 2.0 Flash.
 
 ---
 
 ## 👥 Team
 
 **SUPARCO Lunar Exploration Program**  
-Developed for Final Year Project
+Developed as a Final Year Project for Satellite Analysis
 
 ---
 
-## 🛠️ Troubleshooting
-
-**App won't launch?**
-```bash
-pip install -r requirements.txt
-export PYTHONPATH=.
-```
-
-**SAM 2 errors?**
-- App works in composition-only mode
-- SAM is optional for basic demo
-
----
-
-**Status**: Ready for demonstration and thesis writeup! 🎉
+**Status**: Ready for final submission and deployment. 🎉
